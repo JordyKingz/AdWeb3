@@ -1,0 +1,15 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+.superpowers/
+contracts/cache/
+contracts/out/
+contracts/broadcast/
+audit/work/
+.tools/
+android/.gradle/
+android/.kotlin/
+android/local.properties
+**/build/
+*.log
