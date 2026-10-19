@@ -1,0 +1,1 @@
+CREATE TABLE transaction_intents(operation_id text PRIMARY KEY,chain_id bigint NOT NULL,sender text NOT NULL,contract text NOT NULL,nonce bigint NOT NULL,input_hash text NOT NULL,tx_hash text NOT NULL UNIQUE,raw bytea NOT NULL,status text NOT NULL CHECK(status IN ('pending','confirmed','failed')),UNIQUE(chain_id,sender,nonce));

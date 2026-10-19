@@ -123,6 +123,6 @@ An audit gate is complete only when:
 
 If an auditor cannot run or a report is incomplete, record the gate as incomplete. It is never a clean result. Review and evidence collection do not submit transactions or deploy contracts.
 
-## Future execution wrappers
+## Implemented execution wrappers
 
-Phase 1 will implement `make audit-tools-update`, `make audit-contracts PHASE=N` and `make verify-contract-audit PHASE=N` with documented implementations in `scripts/audit/`. These are future orchestration targets, not commands already available in this documentation-only repository. The first target performs the guarded update and writes tool provenance; the second prepares the immutable target and orchestrates both skill invocations using the supported agent runtime; the verifier checks evidence completeness and source/tool revision binding. A successful wrapper exit cannot itself prove absence of vulnerabilities; independent report triage and reviewer closure remain mandatory.
+Phase 1 implements `make audit-tools-update`, `make audit-contracts PHASE=N` and `make verify-contract-audit PHASE=N` with documented implementations in `scripts/audit/`. These wrappers now exist; a passing product suite is separate from completed, reviewed auditor reports. The first target performs the guarded update and writes tool provenance; the second prepares the immutable target and orchestrates both skill invocations using the supported agent runtime; the verifier checks evidence completeness and source/tool revision binding. A successful wrapper exit cannot itself prove absence of vulnerabilities; independent report triage and reviewer closure remain mandatory.

@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 """Invoke the actual skill workflows on immutable, isolated snapshots."""
+from evidence import scoped_files
 import concurrent.futures,datetime,hashlib,json,pathlib,shutil,subprocess,sys,tarfile
 root=pathlib.Path.cwd();phase=int(sys.argv[1]);choice=sys.argv[2] if len(sys.argv)>2 else 'both'
 sha=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
-if subprocess.check_output(['git','status','--porcelain','--untracked-files=normal'],text=True).strip():raise SystemExit('Commit the candidate before auditing; dirty source is not a reviewed SHA.')
+tracked=subprocess.check_output(['git','diff','HEAD','--name-only'],text=True).strip()
+untracked=subprocess.check_output(['git','ls-files','--others','--exclude-standard'],text=True).splitlines()
+excluded=[x for x in untracked if x.startswith('frontend/') or x.startswith('audit/reports/')]
+if tracked or set(untracked)-set(excluded):raise SystemExit('Commit the scoped candidate before auditing; unrelated frontend/report outputs are excluded explicitly.')
 lock=json.loads((root/'audit/tools-lock.json').read_text());stamp=datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ');dest=root/'audit/reports'/sha/stamp;dest.mkdir(parents=True)
-manifest={'source_sha':sha,'source_clean':True,'source_unchanged':False,'phase':phase,'tools':{},'review_status':'pending','findings':[]}
+manifest={'source_sha':sha,'files':scoped_files(root),'source_clean':True,'untracked_excluded':excluded,'source_unchanged':False,'phase':phase,'tools':{},'review_status':'pending','findings':[]}
 archive=root/'audit/work'/f'{sha}.tar';archive.parent.mkdir(parents=True,exist_ok=True)
 subprocess.run(['git','archive','--format=tar','--output',str(archive),sha],check=True)
 def digest(path):

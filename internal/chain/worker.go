@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
+
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -66,8 +66,11 @@ func (w Worker) ProcessOnce(ctx context.Context) error {
 	if e = indexer.Scan(ctx); e != nil {
 		return e
 	}
+	if e = w.recoverPending(ctx); e != nil {
+		return e
+	}
 	contract := bind.NewBoundContract(w.Escrow, w.ABI, w.Client, w.Client, w.Client)
-	rows, e := w.DB.Query(ctx, "SELECT id::text,payer,amount,terms,end_at FROM orders WHERE funded=0 ORDER BY id LIMIT 100")
+	rows, e := w.DB.Query(ctx, "SELECT o.id::text,o.payer,o.amount,o.terms,o.end_at FROM orders o WHERE o.funded=0 AND o.chain_id=$1 AND lower(o.token)=lower($2) AND NOT EXISTS(SELECT 1 FROM chain_registrations r WHERE r.order_id=o.id) ORDER BY o.id LIMIT 100", w.Campaigns.ChainID, w.Campaigns.Token)
 	if e != nil {
 		return e
 	}
@@ -96,26 +99,23 @@ func (w Worker) ProcessOnce(ctx context.Context) error {
 			return e
 		}
 		if output[0].(common.Address) != (common.Address{}) {
+			if _, e = w.DB.Exec(ctx, "INSERT INTO chain_registrations(order_id,chain_id,contract) VALUES($1,$2,$3) ON CONFLICT DO NOTHING", o.id, w.Campaigns.ChainID, w.Escrow.Hex()); e != nil {
+				return e
+			}
 			continue
 		}
 		if o.end+86400 <= time.Now().Unix() {
 			continue
 		}
-		opts := *w.Signer
-		opts.Context = ctx
-		tx, e := contract.Transact(&opts, "registerOrder", id, common.HexToAddress(o.payer), big.NewInt(o.amount), common.HexToHash(o.terms), uint64(o.end+86400))
-		if e != nil {
+		if e = w.submit(ctx, "register:"+o.id, "registerOrder", id, common.HexToAddress(o.payer), big.NewInt(o.amount), common.HexToHash(o.terms), uint64(o.end+86400)); e != nil {
 			return e
 		}
-		r, e := bind.WaitMined(ctx, w.Client, tx)
-		if e != nil {
+
+		if _, e = w.DB.Exec(ctx, "INSERT INTO chain_registrations(order_id,chain_id,contract) VALUES($1,$2,$3) ON CONFLICT DO NOTHING", o.id, w.Campaigns.ChainID, w.Escrow.Hex()); e != nil {
 			return e
-		}
-		if r.Status != 1 {
-			return errors.New("registration reverted")
 		}
 	}
-	rows, e = w.DB.Query(ctx, "SELECT r.id::text,r.order_id::text,r.amount,o.payer FROM refund_intents r JOIN orders o ON o.id=r.order_id WHERE r.status IN ('pending','submitted') ORDER BY r.id LIMIT 100")
+	rows, e = w.DB.Query(ctx, "SELECT r.id::text,r.order_id::text,r.amount,o.payer FROM refund_intents r JOIN orders o ON o.id=r.order_id WHERE r.status IN ('pending','submitted') AND o.chain_id=$1 AND lower(o.token)=lower($2) ORDER BY r.id LIMIT 100", w.Campaigns.ChainID, w.Campaigns.Token)
 	if e != nil {
 		return e
 	}
@@ -146,22 +146,13 @@ func (w Worker) ProcessOnce(ctx context.Context) error {
 		if out[0].(bool) {
 			continue
 		}
-		opts := *w.Signer
-		opts.Context = ctx
-		tx, e := contract.Transact(&opts, "refundOrder", id, crypto.Keccak256Hash([]byte(r.order)), common.HexToAddress(r.payer), big.NewInt(r.amount))
-		if e != nil {
+		if e = w.submit(ctx, "refund:"+r.id, "refundOrder", id, crypto.Keccak256Hash([]byte(r.order)), common.HexToAddress(r.payer), big.NewInt(r.amount)); e != nil {
 			return e
 		}
 		if _, e = w.DB.Exec(ctx, "UPDATE refund_intents SET status='submitted' WHERE id=$1 AND status='pending'", r.id); e != nil {
 			return e
 		}
-		receipt, e := bind.WaitMined(ctx, w.Client, tx)
-		if e != nil {
-			return e
-		}
-		if receipt.Status != 1 {
-			return fmt.Errorf("refund %s reverted", r.id)
-		}
+
 	}
 	return indexer.Scan(ctx)
 }

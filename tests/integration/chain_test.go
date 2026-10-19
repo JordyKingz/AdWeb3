@@ -133,7 +133,45 @@ func TestActualChainFundingAndRefund(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	transact(escrow, "refundOrder", crypto.Keccak256Hash([]byte(refundID)), id, signer.From, big.NewInt(15_000_000))
+	_ = refundID
+	worker := chain.Worker{DB: db, Client: client, Campaigns: s, Escrow: escrowAddress, Signer: signer, ABI: escrowABI, Confirmations: 0}
+	// Simulate a crash after durable signing but before broadcast.
+	prepared, e := worker.Prepare(ctx, "refund:"+refundID, "refundOrder", crypto.Keccak256Hash([]byte(refundID)), id, signer.From, big.NewInt(15_000_000))
+	if e != nil {
+		t.Fatal(e)
+	}
+	recovered, e := worker.Prepare(ctx, "refund:"+refundID, "refundOrder", crypto.Keccak256Hash([]byte(refundID)), id, signer.From, big.NewInt(15_000_000))
+	if e != nil || prepared.Hash() != recovered.Hash() {
+		t.Fatal("intent not durable", e)
+	}
+	if e = worker.ProcessOnce(ctx); e != nil {
+		t.Fatal("worker refund", e)
+	}
+	if e = worker.ProcessOnce(ctx); e != nil {
+		t.Fatal("worker restart refund", e)
+	}
+	// Registered-but-unfunded orders cannot starve later order pages.
+	for n := 0; n < 101; n++ {
+		if _, e = s.CreateOrder(ctx, "worker", store.UUID(), campaigns.Order{Payer: signer.From.Hex(), Amount: 100, Token: asset.Hex(), ChainID: 31337, Start: int64(header.Time), End: int64(header.Time) + 3600}); e != nil {
+			t.Fatal(e)
+		}
+	}
+	other := campaigns.Service{DB: db, ChainID: 43113, Token: asset.Hex()}
+	if _, e = other.CreateOrder(ctx, "other", store.UUID(), campaigns.Order{Payer: signer.From.Hex(), Amount: 100, Token: asset.Hex(), ChainID: 43113, Start: 1, End: 2}); e != nil {
+		t.Fatal(e)
+	}
+	for n := 0; n < 2; n++ {
+		if e = worker.ProcessOnce(ctx); e != nil {
+			t.Fatal("registration page", e)
+		}
+	}
+	var count int
+	if e = db.QueryRow(ctx, "SELECT count(*) FROM chain_registrations WHERE chain_id=31337").Scan(&count); e != nil || count != 101 {
+		t.Fatal("registration starvation", count, e)
+	}
+	if e = db.QueryRow(ctx, "SELECT count(*) FROM chain_registrations WHERE chain_id=43113").Scan(&count); e != nil || count != 0 {
+		t.Fatal("wrong-chain worker registration", count, e)
+	}
 	if e = indexer.Scan(ctx); e != nil {
 		t.Fatal(e)
 	}
