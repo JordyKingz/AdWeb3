@@ -13,7 +13,7 @@
 
 **Architecture:** One modular Go backend with API and worker processes, PostgreSQL ledger and transactional outbox, object storage/CDN for approved creatives, and bounded EVM escrow/distributor contracts. A Kotlin Android SDK separates ad delivery from optional rewards; one small Android game is its first consumer. Game progress remains local/offline; money, ad eligibility, and settlement authority remain server-side.
 
-**Tech stack — proposed implementation choices:** Go standard HTTP routing, PostgreSQL with pgx, versioned SQL migrations, OpenAPI, Solidity with Foundry (Forge/Anvil/Cast), Kotlin Android library modules and a Compose sample/game client. Use server-rendered Go templates for minimal advertiser/admin screens and the wallet-signing page; no separate SPA or microservice estate. Pin compatible stable toolchain/dependency versions during Phase 1/2 bootstrap and record them; this plan does not pretend an uninstalled version has been validated.
+**Tech stack — proposed implementation choices:** Go standard HTTP routing, PostgreSQL with pgx, versioned SQL migrations, OpenAPI, Solidity with Foundry (Forge/Anvil/Cast), Kotlin Android library modules and a Compose sample/game client. Reuse the owner-provided Nuxt 4/Vue frontend in `frontend/` for the public landing page, advertiser dapp and player views, with server routes proxying authoritative Go identity/campaign/reward APIs. Go templates remain a development/operator fallback. Preserve the frontend design; replace or explicitly isolate its in-memory sample data. No microservice estate. Pin compatible stable toolchain/dependency versions during Phase 1/2 bootstrap and record them; this plan does not pretend an uninstalled version has been validated.
 
 ## Confirmed constraints and open decisions
 
@@ -56,6 +56,7 @@ All paths below are relative to `/Users/homer/development/evm/AdWeb3`. Reference
 | `contracts/src/`, `contracts/test/` | Escrow/distributor contracts and isolated test token; Solidity tests/invariants |
 | `android/sdk-core/`, `android/sdk-rewards/` | Core ads/identity versus optional wallet/reward module; no end-user wallet requirement for ordinary ads |
 | `android/game-core/`, `android/pilot/`, `android/sample/` | Deterministic rules; playable first app; later ordinary-ad publisher example |
+| `frontend/app/`, `frontend/server/`, `frontend/shared/` | Existing Nuxt landing/dapp design, session-aware Go proxy and frontend contract types; owned by the current workspace, not a replacement design. |
 | `web/templates/`, `web/static/` | Minimal protected advertiser/operator views and bound wallet-auth page |
 | `tests/integration/`, `tests/e2e/`, `tests/load/`, `docs/runbooks/` | Real database/chain tests, end-to-end scenarios, performance evidence and operator procedures |
 
@@ -88,6 +89,7 @@ No commands below have passed yet: the files/toolchains are future deliverables.
 | `make verify PHASE=N` | All suites introduced through N, including real integration tests; no placeholder/empty pass or test skipping |
 | `make verify-device` | One selected emulator now; physical-device and genuine Play Integrity evidence tracked as owner-approved follow-up |
 | `make verify-e2e` | Full local funded-ad-to-payout flow, migrations, rollback/restore rehearsal and restart recovery from Phase 4 onward |
+| `cd frontend && bun run typecheck && bun run build` | Nuxt type/build validation using supported Node 24.18.1; serialize with the owner's other frontend build process |
 | `make verify-load` | Phase 5: 100 ad decisions/s, p95 <=250ms, recorded dataset/hardware, excluding creative downloads |
 | `make verify-fuji` | Phase 5: test-token deployment/funding/refund/payout on Fuji with recorded addresses, revision and RPC/finality evidence |
 
@@ -121,7 +123,7 @@ These reviews complement the existing per-phase independent review. The final pr
 | 2 | Play an Android game and establish verified installation/wallet sessions | US-04, US-05 | L | 1; selected game slice and device/account access | Not started |
 | 3 | Serve and measure valid expiring ads in that game; safe offline transitions | US-02, US-03, US-06, US-15 | L | 1–2 | Not started |
 | 4 | Settle original cohorts and make retry-safe test payouts | US-07, US-09 | L | 1–3 | Not started |
-| 5 | Deliver a measurable, recoverable Android/Fuji pilot and grant evidence | US-10 | M | 1–4 | Not started |
+| 5 | Deliver the integrated landing/dapp, measurable Android/Fuji pilot and grant evidence | US-10, US-16 | M | 1–4 | Not started |
 | 6 | Integrate an approved external publisher with the Android ads SDK | US-11, US-12 | L | 1–5; separate beta scope/terms approval | Not started — separate beta |
 | 7 | Settle partner earnings at 80/20 and enforce inventory/reward terms | US-13, US-14 | L | 6 | Not started — separate beta |
 
@@ -399,7 +401,7 @@ Record evidence and report `Phase 4 complete — deliverable — files — revie
 
 **Hard-deliverable check:** One physical Android device runs a Fuji test campaign through payment, expiry, refund and payout; operators can pause and reconcile it, and evidence distinguishes test activity from customers.
 
-**User stories covered:** US-10 (AC-10.1–10.4)
+**User stories covered:** US-10 (AC-10.1–10.5), US-16 (AC-16.1–16.4)
 
 **Complexity:** M · **Depends on:** Phases 1–4; applicant-controlled test environment/device; no mainnet or store-publication authorization inferred.
 
@@ -621,14 +623,25 @@ This plan neither validates eight weeks nor spends the grant. Update the grant b
 | US-13 | 7 |
 | US-14 | 7 |
 | US-15 | 3 |
+| US-16 | 5 |
 
 **Unassigned stories:** None. Pilot approval does not authorize the separately scoped beta stories.
+
+## Nuxt adoption tasks across the pilot
+
+Owner requested reuse of the existing frontend on 2026-10-19. This is authorized pilot scope and preserves its design. Its sample campaign/reward stores are currently preview scaffolding. Do not wire browser-provided status/payer fields directly to money or trust a Nuxt receipt check as finalized Go indexing.
+
+- [ ] Phase 2: Go-issued wallet challenges, atomic nonce consumption and server sessions become authoritative. Connect the Nuxt wallet flow and private server-only proxy configuration; test session expiry, exact origin/domain/URI and cross-account attempts. Preserve a clearly labeled preview only when explicitly selected.
+- [ ] Phase 3: Campaign create/report/pause routes use authenticated Go APIs, owned app/placement/creative rules and Go-issued chain order IDs/terms. Test owner isolation, idempotent retries, dates/caps and pending versus confirmed funding; a failed/unavailable backend cannot silently fall back to fake funding.
+- [ ] Phase 4: Player dashboard reads actual Go pending/finalized/paid state and transaction references. Remove fabricated payout hashes from connected mode and bind account changes to new proof.
+- [ ] Phase 5: Complete US-16 with Nuxt typecheck/build, server/API tests and browser checks for landing, connect, campaign and player journeys. Record preview versus connected-testnet operation and feature availability. Keep all runtime credentials private.
 
 ## Deviations from the spec / planning decisions
 
 | Date | Phase | What changed | Why |
 |------|-------|--------------|-----|
 | 2026-10-19 | Planning | Added FR-17 / US-15 and concrete Android acceptance criteria to the spec | Existing Android game deliverable needed explicit traceability; no additional game or full-port scope added. |
+| 2026-10-19 | Pilot scope | Adopt existing Nuxt landing/dapp design and connect to Go across Phases 2–5, adding FR-18 / US-16 | Owner provided the frontend and asked to use it; Nitro demo data must not become financial authority. |
 | 2026-10-19 | Planning | Added owner-requested Nemesis/Pashov update, review and retest gates with NFR-09 / AC-10.5 | Contract development requires both internal-audit skills from the existing shared tool checkouts. |
 | 2026-10-19 | Planning | Conditional draft written while GAP-B01–B04 remain open | Owner explicitly requested a plan; test assumptions are exposed for approval, not treated as resolved commercial/launch decisions. |
 
@@ -655,6 +668,7 @@ No implementation evidence exists yet. Populate each acceptance criterion indivi
 | FR-15 | US-13 — all listed ACs | 7 | None yet | Not run | Not started |
 | FR-16 | US-14 — all listed ACs | 7 | None yet | Not run | Not started |
 | FR-17 | US-15 — all listed ACs | 3 | None yet | Not run | Not started |
+| FR-18 | US-16 — all listed ACs | 5 | None yet | Not run | Not started |
 | NFR-01 | US-01, US-03, US-07, US-08, US-09 — all listed ACs | 1, 3, 4 | None yet | Not run | Not started |
 | NFR-02 | US-02, US-04, US-06 — all listed ACs | 2, 3 | None yet | Not run | Not started |
 | NFR-03 | US-04, US-05, US-10 — all listed ACs | 2, 5 | None yet | Not run | Not started |
@@ -712,6 +726,10 @@ Each criterion below has a planned owner, not a passing result. Expand the evide
 | AC-15.1 | 3 | None / not run | Not started |
 | AC-15.2 | 3 | None / not run | Not started |
 | AC-15.3 | 3 | None / not run | Not started |
+| AC-16.1 | 5 | None / not run | Not started |
+| AC-16.2 | 5 | None / not run | Not started |
+| AC-16.3 | 5 | None / not run | Not started |
+| AC-16.4 | 5 | None / not run | Not started |
 
 ## Final feature review
 
@@ -730,6 +748,6 @@ Use an independent read-only reviewer with the current spec, this plan, full dif
 
 ## Planning validation and reference material
 
-Document validation is separate from product verification. Planning self-review on 2026-10-19 checked all 26 requirement mappings, 15 unique story completion owners, 41 acceptance-criterion evidence rows, mandatory sections for seven phases, file-action consistency, scope boundaries, and local links. Corrected the Android SDK build-file creation dependency; product checks remain Not run. No Go, Android or contract suite can run in the current documentation-only workspace.
+Document validation is separate from product verification. Planning self-review on 2026-10-19 checked the initial 26 requirement mappings, 15 unique story completion owners and 41 acceptance-criterion evidence rows; the owner's Nuxt addition expands this to 27 requirements, 16 stories and 45 criteria, mandatory sections for seven phases, file-action consistency, scope boundaries, and local links. Corrected the Android SDK build-file creation dependency; product checks remain Not run. No Go, Android or contract suite can run in the current documentation-only workspace.
 
 References checked while planning: [Play Integrity overview and request binding](https://developer.android.com/google/play/integrity/overview), [Android library publication](https://developer.android.com/build/publish-library), [Solidity security considerations](https://docs.soliditylang.org/en/latest/security-considerations.html). Use current stable implementation documentation when pinning versions. Official distribution/integrity setup and library metadata matter; an emulator or mock verifier is not a substitute for the required physical-device evidence.

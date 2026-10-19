@@ -17,3 +17,14 @@ __pycache__/
 *.pyc
 
 /cache/
+.vercel/
+.claude/launch.json
+*.pem
+*.key
+*.keystore
+*.jks
+*.p12
+*.pfx
+service-account*.json
+client_secret*.json
+**/google-services.json

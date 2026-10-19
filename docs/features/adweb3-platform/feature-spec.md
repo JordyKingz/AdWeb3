@@ -42,6 +42,7 @@ The confirmed platform and commercial decisions above govern this draft; detaile
 | FR-15 | SDK access is free; ordinary partner inventory allocates 80% of accepted earned net revenue to the publisher and 20% to AdWeb3, with no second commission. Accepted delivery creates publisher liabilities under the snapshotted commercial agreement; statements show gross delivery charges, permitted deductions, all allocation shares, holds, adjustments, payable balance, and payout status. Settlement and retries cannot exceed backing or pay twice. | Must — publisher beta |
 | FR-16 | Advertisers explicitly approve eligible publisher inventory and whether player incentives apply; serving rejects unapproved inventory or incentive modes. Reward funding stays attached to its original app/campaign cohort. | Must — publisher beta |
 | FR-17 | The Android pilot provides one bounded playable Candy Blocks candidate slice, local progress save/resume, and a reusable SDK integration with Home/results sponsor placement; existing iOS source is reference material, not claimed Android implementation. Exact game content remains subject to plan approval. | Must — pilot |
+| FR-18 | Reuse the existing Nuxt frontend as the public landing page and advertiser/player dapp. Connected campaign, wallet and balance flows use the Go API as authority, enforce account ownership, and clearly distinguish preview data from actual indexed funding, delivery and payouts. | Must — pilot |
 
 ### Non-functional
 
@@ -120,6 +121,8 @@ These decisions remain open. At the owner's explicit request, the implementation
 ### Contract development and internal audit
 
 The owner requires Foundry-based contract development plus updated Nemesis and Pashov skill reviews from `/Users/homer/development/audits/capyfi-smart-contracts/audit/tools`. Follow the [contract-audit runbook](../../runbooks/contract-audit.md): pin tool/source revisions, independently run both workflows, retain reports, fix verified findings with Foundry regressions, and retest both. Apply this at escrow/distributor development, contract-affecting changes, and final pilot/full-feature candidates. No AdWeb3 contract audit has run at this specification stage.
+
+**Web frontend decision, confirmed 2026-10-19:** Reuse `frontend/`, the Nuxt 4/Vue design created by the owner's other coding session, for landing, advertiser dapp and player views. Its inspected server currently contains Nitro in-memory campaigns/sessions and sample rewards. Those are preview implementations, not the authoritative financial system. Integrate its server routes as a session-aware backend-for-frontend over Go; use Go-issued order IDs/terms and indexed balances/status. Preserve the visual design. Frontend build/runtime verification and permission/ownership tests are part of the pilot. The simple Go campaign page may remain a development/operator fallback.
 
 ### Proposed infrastructure
 
@@ -427,6 +430,14 @@ If targeting the Netherlands/EU, assess issuance, custody, redemption/exchange, 
 - **AC-15.2:** Given an offline run and process restart, when the player resumes, then local progress is restored without requiring a wallet or network; unavailable ads/rewards do not block the game.
 - **AC-15.3:** Given the first Android SDK integration, when the physical-device demo runs, then sponsor UI is confined to the approved Home/results placement, lifecycle/expiry behavior is verified, and package/SDK versions are recorded.
 
+### US-16: Use the landing page and dapp
+- **Epic:** EP-04
+- **As a** visitor, advertiser or player, **I want** the existing Nuxt design to provide product information and authenticated campaign/reward views, **so that** the web experience reflects actual account activity.
+- **AC-16.1:** Given an unauthenticated visitor, when the landing page loads, then it renders without a wallet; private dapp routes require a bound authenticated session and previews are explicitly labeled.
+- **AC-16.2:** Given an authenticated advertiser, when a campaign is created/funded/reported, then Go-issued order IDs and terms, indexed finality, ownership and accepted delivery determine its status; another account cannot read or change it.
+- **AC-16.3:** Given a player session, when balances/payouts are displayed, then pending, finalized and confirmed-paid states come from the Go ledger; sample transactions are never presented as live payments.
+- **AC-16.4:** Given server secrets and untrusted browser requests, when the Nuxt server proxies a request, then credentials remain server-side and client-supplied actor, funding, status or reward fields cannot grant authority.
+
 ### Traceability
 
 | Requirement | Covered by |
@@ -448,6 +459,7 @@ If targeting the Netherlands/EU, assess issuance, custody, redemption/exchange, 
 | FR-15 | US-13 |
 | FR-16 | US-14 |
 | FR-17 | US-15 |
+| FR-18 | US-16 |
 | NFR-01 | US-01, US-03, US-07, US-08, US-09 |
 | NFR-02 | US-02, US-04, US-06 |
 | NFR-03 | US-04, US-05, US-10 |

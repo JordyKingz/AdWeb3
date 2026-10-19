@@ -1,0 +1,27 @@
+{
+  "name": "adweb3-frontend",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "nuxt dev",
+    "build": "nuxt build",
+    "preview": "nuxt preview",
+    "typecheck": "nuxt typecheck",
+    "postinstall": "nuxt prepare",
+    "generate:landing": "NUXT_PUBLIC_LANDING_ONLY=true nuxt generate",
+    "verify:landing": "node scripts/verify-landing.mjs"
+  },
+  "dependencies": {
+    "nuxt": "^4.6.2",
+    "viem": "^2.57.7",
+    "vue": "^3.5.44"
+  },
+  "devDependencies": {
+    "@types/node": "24",
+    "typescript": "^5.9.0",
+    "vue-tsc": "^3.3.13"
+  },
+  "engines": {
+    "node": "24.x"
+  }
+}

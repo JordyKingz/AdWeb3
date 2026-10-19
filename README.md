@@ -2,6 +2,8 @@
 
 Android-first advertiser-funded game rewards. The repository is in implementation; see the [plan](docs/features/adweb3-platform/implementation-plan.md) and [execution evidence](docs/evidence/implementation-progress.md). Local Anvil and Fuji test assets only; no mainnet launch.
 
+The Nuxt landing and development dApp are in [`frontend/`](frontend/README.md). Vercel should use that folder as its Root Directory and the static landing build configured there; no deployment secrets are needed. Read [SECURITY.md](SECURITY.md) before adding environment configuration to this public repository.
+
 ## Development
 
 Required: Go 1.25.3, Foundry 1.5.1 / Solidity 0.8.30, PostgreSQL 16, and an isolated Anvil chain. Android additionally uses its Gradle wrapper and the SDK. `make verify PHASE=1` runs Foundry, Go, race, real-database/Anvil integration and audit-evidence validator tests. It fails if required services are absent; later phase verification cannot silently pass before it exists.
