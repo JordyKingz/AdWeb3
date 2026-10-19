@@ -4,7 +4,6 @@
   "installCommand": "bun install --frozen-lockfile",
   "buildCommand": "bun run generate:landing && bun run verify:landing",
   "outputDirectory": ".output/public",
-  "public": false,
   "cleanUrls": true,
   "redirects": [
     { "source": "/connect", "destination": "/#pilot", "permanent": false },
