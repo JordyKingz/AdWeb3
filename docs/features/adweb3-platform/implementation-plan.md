@@ -4,9 +4,9 @@
 
 - **Slug:** `adweb3-platform`
 - **Spec:** [feature-spec.md](feature-spec.md)
-- **Status:** Draft — written at the owner's request; no product implementation authorized or started
+- **Status:** In progress — owner approved pilot Phases 1–5 with reviews/internal audits; publisher beta remains excluded
 - **Date:** 2026-10-19
-- **Execution scope:** Default proposed approval is pilot Phases 1–5 only. Phases 6–7 describe the separately budgeted publisher beta and require explicit inclusion in the approved scope. Completing the pilot does not complete the full publisher feature.
+- **Execution scope:** Owner approved pilot Phases 1–5 on 2026-10-19, including reviews and internal audits. Phases 6–7 describe the separately budgeted publisher beta and require explicit inclusion in the approved scope. Completing the pilot does not complete the full publisher feature.
 - **Execution policy:** TDD → implementation → refactor → independent review → fix/re-review → spec/plan reconciliation → next approved phase. Zero unresolved MUST-FIX or SHOULD-FIX findings before proceeding. Pause only for a genuine dependency/blocker, material scope decision, new external authorization, or explicit user stop.
 
 **Goal:** Demonstrate one Android game receiving funded campaign ads and earning validated points that settle into test-token payouts, then extend the same SDK/backend to approved third-party publishers.
@@ -16,6 +16,8 @@
 **Tech stack — proposed implementation choices:** Go standard HTTP routing, PostgreSQL with pgx, versioned SQL migrations, OpenAPI, Solidity with Foundry (Forge/Anvil/Cast), Kotlin Android library modules and a Compose sample/game client. Use server-rendered Go templates for minimal advertiser/admin screens and the wallet-signing page; no separate SPA or microservice estate. Pin compatible stable toolchain/dependency versions during Phase 1/2 bootstrap and record them; this plan does not pretend an uninstalled version has been validated.
 
 ## Confirmed constraints and open decisions
+
+**Verification amendment accepted 2026-10-19:** Owner has a pending Play Console account and is waiting for the physical Android device. Use one emulator for the current pilot development/verification cycle. Physical-device validation and genuine Play Integrity evidence are deferred to a follow-up when available; do not label simulation as real-device/integrity evidence or enable unverified monetary activity. Emulator/device clauses below refer to this amendment where a physical check cannot yet run.
 
 - Android first; iOS and cross-engine wrappers are deferred.
 - Free publisher SDK access; 20% AdWeb3 commission and 80% publisher allocation for ordinary partner ads, applied once to accepted earned net revenue.
@@ -84,7 +86,7 @@ No commands below have passed yet: the files/toolchains are future deliverables.
 | `./android/gradlew -p android testDebugUnitTest lintDebug` | Android library/game JVM tests and lint after Android modules exist |
 | `ANDROID_SERIAL=<selected-device> ./android/gradlew -p android connectedDebugAndroidTest` | Exactly one selected physical Android test device; record device/OS/build. Missing device is unmet evidence, not a pass |
 | `make verify PHASE=N` | All suites introduced through N, including real integration tests; no placeholder/empty pass or test skipping |
-| `make verify-device` | Device tests and signed-build integrity/wallet evidence from Phase 2 onward |
+| `make verify-device` | One selected emulator now; physical-device and genuine Play Integrity evidence tracked as owner-approved follow-up |
 | `make verify-e2e` | Full local funded-ad-to-payout flow, migrations, rollback/restore rehearsal and restart recovery from Phase 4 onward |
 | `make verify-load` | Phase 5: 100 ad decisions/s, p95 <=250ms, recorded dataset/hardware, excluding creative downloads |
 | `make verify-fuji` | Phase 5: test-token deployment/funding/refund/payout on Fuji with recorded addresses, revision and RPC/finality evidence |
@@ -115,7 +117,7 @@ These reviews complement the existing per-phase independent review. The final pr
 
 | Phase | Deliverable | Story completion owner | Complexity | Depends on | Status |
 |-------|-------------|-----------------------|------------|------------|--------|
-| 1 | Fund and refund a test campaign with protected ledger backing | US-01, US-08 | L | Accepted testnet/network assumptions | Not started |
+| 1 | Fund and refund a test campaign with protected ledger backing | US-01, US-08 | L | Accepted testnet/network assumptions | In progress |
 | 2 | Play an Android game and establish verified installation/wallet sessions | US-04, US-05 | L | 1; selected game slice and device/account access | Not started |
 | 3 | Serve and measure valid expiring ads in that game; safe offline transitions | US-02, US-03, US-06, US-15 | L | 1–2 | Not started |
 | 4 | Settle original cohorts and make retry-safe test payouts | US-07, US-09 | L | 1–3 | Not started |

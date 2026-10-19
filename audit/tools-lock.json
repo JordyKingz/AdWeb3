@@ -1,0 +1,17 @@
+{
+  "nemesis-auditor": {
+    "path": "/Users/homer/development/audits/capyfi-smart-contracts/audit/tools/nemesis-auditor",
+    "origin": "https://github.com/0xiehnnkta/nemesis-auditor.git",
+    "before": "75cecc6dbd798f82ed8928d1a906078be9c575de",
+    "sha": "75cecc6dbd798f82ed8928d1a906078be9c575de",
+    "updated": true
+  },
+  "pashov-skills": {
+    "path": "/Users/homer/development/audits/capyfi-smart-contracts/audit/tools/pashov-skills",
+    "origin": "https://github.com/pashov/skills.git",
+    "before": "92b0ea6786e6c210bc9a839e4813d50876c1c550",
+    "sha": "92b0ea6786e6c210bc9a839e4813d50876c1c550",
+    "updated": true
+  },
+  "updated_at": "2026-10-19T14:47:54.731711+00:00"
+}

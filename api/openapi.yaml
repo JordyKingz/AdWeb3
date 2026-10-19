@@ -1,0 +1,112 @@
+openapi: 3.1.0
+info:
+  title: AdWeb3 testnet pilot API
+  version: 0.1.0
+servers:
+  - url: http://127.0.0.1:8080
+security:
+  - bearer: []
+paths:
+  /v1/orders:
+    post:
+      operationId: createOrder
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderInput'
+      responses:
+        '200':
+          description: Created or replayed actor-scoped order
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '400': {description: Invalid input}
+        '401': {description: Authentication required}
+        '409': {description: Key reused with different body}
+  /v1/orders/{id}:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+    get:
+      operationId: getOrder
+      responses:
+        '200':
+          description: Actor-owned order
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '401': {description: Authentication required}
+        '404': {description: Order unavailable to this actor}
+  /v1/orders/{id}/refunds:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+    post:
+      operationId: requestRefund
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [amount]
+              properties:
+                amount: {$ref: '#/components/schemas/MinorUnits'}
+      responses:
+        '200':
+          description: Durable refund reservation; not yet a confirmed chain payment
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [refundId, status]
+                properties:
+                  refundId: {type: string, format: uuid}
+                  status: {const: pending}
+        '400': {description: Invalid input}
+        '401': {description: Authentication required}
+        '404': {description: Order unavailable to this actor}
+        '409': {description: Insufficient unreserved backing, quarantine, or conflicting idempotency key}
+components:
+  securitySchemes:
+    bearer: {type: http, scheme: bearer}
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: {type: string, minLength: 1, maxLength: 128}
+  schemas:
+    MinorUnits: {type: string, pattern: '^[0-9]+$'}
+    OrderInput:
+      type: object
+      additionalProperties: false
+      required: [payer, amount, chainId, token, start, end]
+      properties:
+        payer: {type: string, pattern: '^0x[0-9a-fA-F]{40}$'}
+        amount: {$ref: '#/components/schemas/MinorUnits'}
+        chainId: {type: integer, enum: [31337, 43113]}
+        token: {type: string, pattern: '^0x[0-9a-fA-F]{40}$'}
+        start: {type: integer, minimum: 0, description: UTC Unix seconds}
+        end: {type: integer, description: Exclusive UTC end; greater than start}
+    Order:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        advertiser: {type: string}
+        payer: {type: string}
+        amount: {$ref: '#/components/schemas/MinorUnits'}
+        funded: {$ref: '#/components/schemas/MinorUnits'}
+        spent: {$ref: '#/components/schemas/MinorUnits'}
+        chainId: {type: integer}
+        token: {type: string}
+        terms: {type: string, description: Immutable allocation/purchase hash}
+        start: {type: integer}
+        end: {type: integer}
