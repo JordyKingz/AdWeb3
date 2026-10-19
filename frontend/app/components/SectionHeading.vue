@@ -29,8 +29,13 @@ withDefaults(defineProps<{ eyebrow: string; title: string; lede?: string; split?
   align-items: flex-end;
 }
 
-.heading__main {
+/* Basis widths only make sense in the row layout; in a column they would become heights. */
+.heading--split .heading__main {
   flex: 1 1 520px;
+}
+
+.heading--split .heading__lede {
+  flex: 0 1 420px;
 }
 
 .heading__title {
@@ -39,7 +44,6 @@ withDefaults(defineProps<{ eyebrow: string; title: string; lede?: string; split?
 }
 
 .heading__lede {
-  flex: 0 1 420px;
   max-width: 620px;
 }
 
