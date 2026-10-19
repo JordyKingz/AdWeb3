@@ -6,7 +6,7 @@ root=pathlib.Path.cwd();phase=int(sys.argv[1]);choice=sys.argv[2] if len(sys.arg
 sha=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
 tracked=subprocess.check_output(['git','diff','HEAD','--name-only'],text=True).strip()
 untracked=subprocess.check_output(['git','ls-files','--others','--exclude-standard'],text=True).splitlines()
-excluded=[x for x in untracked if x.startswith('frontend/') or x.startswith('audit/reports/')]
+excluded=[x for x in untracked if x.startswith('frontend/') or x.startswith('audit/reports/') or x=='.claude/launch.json']
 if tracked or set(untracked)-set(excluded):raise SystemExit('Commit the scoped candidate before auditing; unrelated frontend/report outputs are excluded explicitly.')
 lock=json.loads((root/'audit/tools-lock.json').read_text());stamp=datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ');dest=root/'audit/reports'/sha/stamp;dest.mkdir(parents=True)
 manifest={'source_sha':sha,'files':scoped_files(root),'source_clean':True,'untracked_excluded':excluded,'source_unchanged':False,'phase':phase,'tools':{},'review_status':'pending','findings':[]}
