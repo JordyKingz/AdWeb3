@@ -30,6 +30,8 @@ The landing build enables `NUXT_PUBLIC_LANDING_ONLY=true`, includes only the `/`
 
 Run `bun run generate:landing` followed by `bun run verify:landing` locally to check the public output. `bun run dev` still provides the full development UI.
 
+The landing command explicitly selects Nitro's `static` preset so local and Vercel builds both write to `.output/public`. Without it, Vercel auto-detection selects `vercel-static` and writes to `.vercel/output/static`, which does not match the verification script or configured output directory. To check the hosted build behavior locally, run `VERCEL=1 CI=1 bun run generate:landing && bun run verify:landing` from a clean output directory.
+
 All `NUXT_PUBLIC_*` values are visible to visitors and included at build time. Leave the public landing's environment-variable list empty. Backend API tokens, database URLs, relayer keys and future session secrets belong only in the backend's private runtime configuration. See [repository security guidance](../SECURITY.md).
 
 ## Routes
