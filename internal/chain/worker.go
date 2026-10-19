@@ -70,7 +70,7 @@ func (w Worker) ProcessOnce(ctx context.Context) error {
 		return e
 	}
 	contract := bind.NewBoundContract(w.Escrow, w.ABI, w.Client, w.Client, w.Client)
-	rows, e := w.DB.Query(ctx, "SELECT o.id::text,o.payer,o.amount,o.terms,o.end_at FROM orders o WHERE o.funded=0 AND o.chain_id=$1 AND lower(o.token)=lower($2) AND NOT EXISTS(SELECT 1 FROM chain_registrations r WHERE r.order_id=o.id) ORDER BY o.id LIMIT 100", w.Campaigns.ChainID, w.Campaigns.Token)
+	rows, e := w.DB.Query(ctx, "SELECT o.id::text,o.payer,o.amount,o.terms,o.end_at FROM orders o WHERE o.funded=0 AND o.end_at+86400>$3 AND o.chain_id=$1 AND lower(o.token)=lower($2) AND NOT EXISTS(SELECT 1 FROM chain_registrations r WHERE r.order_id=o.id) ORDER BY o.id LIMIT 100", w.Campaigns.ChainID, w.Campaigns.Token, time.Now().Unix())
 	if e != nil {
 		return e
 	}
@@ -95,7 +95,16 @@ func (w Worker) ProcessOnce(ctx context.Context) error {
 	for _, o := range orders {
 		var output []any
 		id := crypto.Keccak256Hash([]byte(o.id))
-		if e = contract.Call(&bind.CallOpts{Context: ctx}, &output, "orders", id); e != nil {
+		head, e := w.Client.HeaderByNumber(ctx, nil)
+		if e != nil {
+			return e
+		}
+		finalHeight := head.Number.Uint64()
+		if finalHeight < w.Confirmations {
+			return nil
+		}
+		finalHeight -= w.Confirmations
+		if e = contract.Call(&bind.CallOpts{Context: ctx, BlockNumber: new(big.Int).SetUint64(finalHeight)}, &output, "orders", id); e != nil {
 			return e
 		}
 		if output[0].(common.Address) != (common.Address{}) {
@@ -109,6 +118,13 @@ func (w Worker) ProcessOnce(ctx context.Context) error {
 		}
 		if e = w.submit(ctx, "register:"+o.id, "registerOrder", id, common.HexToAddress(o.payer), big.NewInt(o.amount), common.HexToHash(o.terms), uint64(o.end+86400)); e != nil {
 			return e
+		}
+		var intentStatus string
+		if e = w.DB.QueryRow(ctx, "SELECT status FROM transaction_intents WHERE operation_id=$1", "register:"+o.id).Scan(&intentStatus); e != nil {
+			return e
+		}
+		if intentStatus != "confirmed" {
+			continue
 		}
 
 		if _, e = w.DB.Exec(ctx, "INSERT INTO chain_registrations(order_id,chain_id,contract) VALUES($1,$2,$3) ON CONFLICT DO NOTHING", o.id, w.Campaigns.ChainID, w.Escrow.Hex()); e != nil {

@@ -80,6 +80,16 @@ func (w Worker) broadcast(ctx context.Context, id string, signed *types.Transact
 	if receipt.Status != 1 {
 		status = "failed"
 	}
+	if status == "confirmed" && w.Confirmations > 0 {
+		head, e := w.Client.HeaderByNumber(ctx, nil)
+		if e != nil {
+			return e
+		}
+		if head.Number.Uint64() < receipt.BlockNumber.Uint64()+w.Confirmations {
+			status = "pending"
+		}
+	}
+
 	if _, e = w.DB.Exec(ctx, "UPDATE transaction_intents SET status=$2 WHERE operation_id=$1", id, status); e != nil {
 		return e
 	}

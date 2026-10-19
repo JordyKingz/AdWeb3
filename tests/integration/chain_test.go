@@ -8,6 +8,7 @@ import (
 	"adweb3.local/platform/internal/store"
 	"context"
 	"encoding/json"
+	"fmt"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -278,5 +279,107 @@ func TestCheckpointReorgQuarantinesRefunds(t *testing.T) {
 	var quarantined bool
 	if e = db.QueryRow(ctx, "SELECT quarantined FROM chain_health WHERE chain_id=31337").Scan(&quarantined); e != nil || !quarantined {
 		t.Fatal("missing persistent quarantine", e)
+	}
+}
+
+func workerFixture(t *testing.T, confirmations uint64) (chain.Worker, common.Address) {
+	t.Helper()
+	ctx := context.Background()
+	client, e := ethclient.Dial(os.Getenv("EVM_RPC_URL"))
+	if e != nil {
+		t.Fatal(e)
+	}
+	t.Cleanup(client.Close)
+	key, _ := crypto.HexToECDSA("ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
+	signer, _ := bind.NewKeyedTransactorWithChainID(key, big.NewInt(31337))
+	a, code := artifact(t, "TestToken")
+	asset, tx, _, e := bind.DeployContract(signer, a, code, client)
+	if e != nil {
+		t.Fatal(e)
+	}
+	bind.WaitMined(ctx, client, tx)
+	a, code = artifact(t, "CampaignEscrow")
+	escrow, tx, _, e := bind.DeployContract(signer, a, code, client, asset, signer.From, signer.From, signer.From)
+	if e != nil {
+		t.Fatal(e)
+	}
+	bind.WaitMined(ctx, client, tx)
+	db := database(t)
+	return chain.Worker{DB: db, Client: client, Campaigns: campaigns.Service{DB: db, ChainID: 31337, Token: asset.Hex()}, Escrow: escrow, Signer: signer, ABI: a, Confirmations: confirmations}, asset
+}
+func TestExpiredOrdersDoNotStarveRegistration(t *testing.T) {
+	ctx := context.Background()
+	w, asset := workerFixture(t, 0)
+	for n := 0; n < 101; n++ {
+		if _, e := w.Campaigns.CreateOrder(ctx, "expired", store.UUID(), campaigns.Order{Payer: w.Signer.From.Hex(), Amount: 100, Token: asset.Hex(), ChainID: 31337, Start: 0, End: 1}); e != nil {
+			t.Fatal(e)
+		}
+	}
+	head, _ := w.Client.HeaderByNumber(ctx, nil)
+	o, e := w.Campaigns.CreateOrder(ctx, "live", store.UUID(), campaigns.Order{Payer: w.Signer.From.Hex(), Amount: 100, Token: asset.Hex(), ChainID: 31337, Start: int64(head.Time), End: int64(head.Time) + 3600})
+	if e != nil {
+		t.Fatal(e)
+	}
+	// Deterministically place the live fixture after all 101 expired UUIDs.
+	for index := 0; index < 101; index++ {
+		_, e = w.DB.Exec(ctx, "UPDATE orders SET id=$1 WHERE id=(SELECT id FROM orders WHERE advertiser='expired' AND id::text NOT LIKE '00000000-%' LIMIT 1)", fmt.Sprintf("00000000-0000-4000-8000-%012d", index))
+		if e != nil {
+			t.Fatal(e)
+		}
+	}
+	oldID := o.ID
+	o.ID = "ffffffff-ffff-4fff-8fff-ffffffffffff"
+	if _, e = w.DB.Exec(ctx, "UPDATE orders SET id=$1,chain_order_id=$2 WHERE id=$3", o.ID, crypto.Keccak256Hash([]byte(o.ID)).Hex(), oldID); e != nil {
+		t.Fatal(e)
+	}
+	if e = w.ProcessOnce(ctx); e != nil {
+		t.Fatal(e)
+	}
+	var count int
+	if e = w.DB.QueryRow(ctx, "SELECT count(*) FROM chain_registrations WHERE order_id=$1", o.ID).Scan(&count); e != nil || count != 1 {
+		t.Fatal("expired rows starved live registration", count, e)
+	}
+}
+func TestMinedRegistrationReorgAndRestart(t *testing.T) {
+	ctx := context.Background()
+	w, asset := workerFixture(t, 2)
+	for n := 0; n < 3; n++ {
+		if e := w.Client.Client().CallContext(ctx, nil, "evm_mine"); e != nil {
+			t.Fatal(e)
+		}
+	}
+	head, _ := w.Client.HeaderByNumber(ctx, nil)
+	o, e := w.Campaigns.CreateOrder(ctx, "live", store.UUID(), campaigns.Order{Payer: w.Signer.From.Hex(), Amount: 100, Token: asset.Hex(), ChainID: 31337, Start: int64(head.Time), End: int64(head.Time) + 3600})
+	if e != nil {
+		t.Fatal(e)
+	}
+	var snapshot string
+	if e = w.Client.Client().CallContext(ctx, &snapshot, "evm_snapshot"); e != nil {
+		t.Fatal(e)
+	}
+	if e = w.ProcessOnce(ctx); e != nil {
+		t.Fatal(e)
+	}
+	var count int
+	if e = w.DB.QueryRow(ctx, "SELECT count(*) FROM chain_registrations WHERE order_id=$1", o.ID).Scan(&count); e != nil || count != 0 {
+		t.Fatal("unfinal registration became permanent", count, e)
+	}
+	var reverted bool
+	if e = w.Client.Client().CallContext(ctx, &reverted, "evm_revert", snapshot); e != nil || !reverted {
+		t.Fatal(e)
+	}
+	if e = w.ProcessOnce(ctx); e != nil {
+		t.Fatal("restart recovery", e)
+	}
+	for n := 0; n < 3; n++ {
+		if e = w.Client.Client().CallContext(ctx, nil, "evm_mine"); e != nil {
+			t.Fatal(e)
+		}
+	}
+	if e = w.ProcessOnce(ctx); e != nil {
+		t.Fatal("final recovery", e)
+	}
+	if e = w.DB.QueryRow(ctx, "SELECT count(*) FROM chain_registrations WHERE order_id=$1", o.ID).Scan(&count); e != nil || count != 1 {
+		t.Fatal("final registration missing", count, e)
 	}
 }
